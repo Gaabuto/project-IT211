@@ -1,8 +1,6 @@
 package com.example.projecto.security.jwt;
 
 import com.example.projecto.repository.TokenBlacklistRepository;
-import com.example.projecto.security.jwt.JwtUtil;
-import com.example.projecto.service.TokenBlacklistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,7 +25,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
-    private final TokenBlacklistService tokenBlacklistService;
+    private final TokenBlacklistRepository tokenBlacklistRepository;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -45,8 +43,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         final String jwt = authHeader.substring(7);
 
         try {
-            // Kiểm tra Blacklist trước
-            if (tokenBlacklistService.isBlacklisted(jwt)) {
+            if (tokenBlacklistRepository.existsByTokenString(jwt)) {
                 log.warn("Blacklisted token used from IP: {}", request.getRemoteAddr());
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token has been revoked");
                 return;

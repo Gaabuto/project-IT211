@@ -1,6 +1,9 @@
 package com.example.projecto.service;
 
-import com.example.projecto.model.dto.request.*;
+import com.example.projecto.model.dto.request.ChangePasswordRequest;
+import com.example.projecto.model.dto.request.LoginRequest;
+import com.example.projecto.model.dto.request.RefreshTokenRequest;
+import com.example.projecto.model.dto.request.RegisterRequest;
 import com.example.projecto.model.dto.response.AuthResponse;
 
 public interface AuthService {
@@ -9,6 +12,4 @@ public interface AuthService {
     void logout(String token);
     void register(RegisterRequest request);
     void changePassword(String username, ChangePasswordRequest request);
-    void forgotPassword(ForgotPasswordRequest request);
-    void resetPassword(ResetPasswordRequest request);
 }
