@@ -8,7 +8,6 @@ import com.example.projecto.model.dto.request.RegisterRequest;
 import com.example.projecto.model.dto.response.AuthResponse;
 import com.example.projecto.model.entity.RoleEnum;
 import com.example.projecto.model.entity.User;
-import com.example.projecto.repository.TokenBlacklistRepository;
 import com.example.projecto.repository.UserRepository;
 import com.example.projecto.security.jwt.JwtUtil;
 import com.example.projecto.service.impl.AuthServiceImpl;
@@ -35,7 +34,7 @@ class AuthServiceTest {
 
     @Mock AuthenticationManager authenticationManager;
     @Mock UserRepository userRepository;
-    @Mock TokenBlacklistRepository tokenBlacklistRepository;
+    @Mock TokenBlacklistService tokenBlacklistService;
     @Mock JwtUtil jwtUtil;
     @Mock PasswordEncoder passwordEncoder;
     @Mock UserDetailsService userDetailsService;
@@ -57,7 +56,6 @@ class AuthServiceTest {
                 .build();
     }
 
-    // Test 1: Đăng nhập thành công
     @Test
     void login_success_returnsTokens() {
         LoginRequest request = new LoginRequest();
@@ -76,7 +74,6 @@ class AuthServiceTest {
         verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
     }
 
-    // Test 2: Đăng nhập sai mật khẩu
     @Test
     void login_wrongPassword_throwsBadCredentials() {
         LoginRequest request = new LoginRequest();
@@ -90,7 +87,6 @@ class AuthServiceTest {
                 .isInstanceOf(BadCredentialsException.class);
     }
 
-    // Test 3: Đăng ký thành công
     @Test
     void register_success_savesUser() {
         RegisterRequest request = new RegisterRequest();
@@ -111,7 +107,6 @@ class AuthServiceTest {
         ));
     }
 
-    // Test 4: Đăng ký username đã tồn tại
     @Test
     void register_duplicateUsername_throwsException() {
         RegisterRequest request = new RegisterRequest();
@@ -127,7 +122,6 @@ class AuthServiceTest {
                 .hasMessageContaining("Username already exists");
     }
 
-    // Test 5: Đổi mật khẩu sai mật khẩu cũ
     @Test
     void changePassword_wrongCurrentPassword_throwsException() {
         ChangePasswordRequest request = new ChangePasswordRequest();
