@@ -5,7 +5,9 @@ import com.example.projecto.model.dto.response.SubmissionResponse;
 import com.example.projecto.model.entity.SubmissionStatus;
 import com.example.projecto.service.SubmissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -17,18 +19,23 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(LecturerController.class)
-class SubmissionControllerTest {
+public class SubmissionControllerTest {
 
-    @Autowired MockMvc mockMvc;
-    @Autowired ObjectMapper objectMapper;
-    @MockitoBean SubmissionService submissionService;
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @MockitoBean
+    private SubmissionService submissionService;
 
     private SubmissionResponse mockResponse() {
         return SubmissionResponse.builder()
@@ -42,14 +49,14 @@ class SubmissionControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "lecturer01", roles = "LECTURER")
-    void gradeSubmission_validRequest_returns200() throws Exception {
+    @DisplayName("LecturerController - Chấm điểm thành công trả về 200")
+    void testGradeSubmission_ValidRequest_Returns200() throws Exception {
         GradeRequest request = new GradeRequest();
         request.setSubmissionId(1L);
         request.setScore(85.0);
         request.setFeedback("Good work");
 
-        when(submissionService.gradeSubmission(eq("lecturer01"), any(GradeRequest.class)))
+        Mockito.when(submissionService.gradeSubmission(eq("lecturer01"), any(GradeRequest.class)))
                 .thenReturn(mockResponse());
 
         mockMvc.perform(post("/api/v1/lecturer/grades")
@@ -63,8 +70,9 @@ class SubmissionControllerTest {
     }
 
     @Test
+    @DisplayName("LecturerController - Thiếu submissionId trả về 400")
     @WithMockUser(username = "lecturer01", roles = "LECTURER")
-    void gradeSubmission_missingSubmissionId_returns400() throws Exception {
+    void testGradeSubmission_MissingSubmissionId_Returns400() throws Exception {
         GradeRequest request = new GradeRequest();
         request.setScore(85.0);
 
@@ -76,8 +84,9 @@ class SubmissionControllerTest {
     }
 
     @Test
+    @DisplayName("LecturerController - Score vượt 100 trả về 400")
     @WithMockUser(username = "lecturer01", roles = "LECTURER")
-    void gradeSubmission_scoreTooHigh_returns400() throws Exception {
+    void testGradeSubmission_ScoreTooHigh_Returns400() throws Exception {
         GradeRequest request = new GradeRequest();
         request.setSubmissionId(1L);
         request.setScore(150.0);
@@ -90,16 +99,18 @@ class SubmissionControllerTest {
     }
 
     @Test
+    @DisplayName("LecturerController - Student gọi API Lecturer trả về 403")
     @WithMockUser(username = "student01", roles = "STUDENT")
-    void getSubmissions_studentRole_returns403() throws Exception {
+    void testGetSubmissions_StudentRole_Returns403() throws Exception {
         mockMvc.perform(get("/api/v1/lecturer/courses/1/submissions"))
                 .andExpect(status().isForbidden());
     }
 
     @Test
+    @DisplayName("LecturerController - Lấy danh sách submission theo course thành công")
     @WithMockUser(username = "lecturer01", roles = "LECTURER")
-    void getSubmissions_validCourseId_returns200() throws Exception {
-        when(submissionService.getSubmissionsByCourse(eq(1L), any(Pageable.class)))
+    void testGetSubmissions_ValidCourseId_Returns200() throws Exception {
+        Mockito.when(submissionService.getSubmissionsByCourse(eq(1L), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(mockResponse())));
 
         mockMvc.perform(get("/api/v1/lecturer/courses/1/submissions"))

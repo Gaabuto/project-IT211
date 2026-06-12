@@ -1,6 +1,5 @@
 package com.example.projecto.aspect;
 
-
 import com.example.projecto.model.dto.request.GradeRequest;
 import com.example.projecto.model.dto.response.SubmissionResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +26,7 @@ public class LoggingAspect {
                 jp.getArgs());
     }
 
+    // ────────── FR-11: Log thời gian thực thi (Controller + Service) ──────────
     @Around("execution(* com.example.projecto.service..*(..))" +
             " || execution(* com.example.projecto.controller..*(..))")
     public Object logExecutionTime(ProceedingJoinPoint pjp) throws Throwable {
@@ -34,14 +34,12 @@ public class LoggingAspect {
         Object result = pjp.proceed();
         long elapsed = System.currentTimeMillis() - start;
 
-        log.info("[PERF] {} | {}ms",
-                pjp.getSignature().toShortString(),
-                elapsed);
+        log.info("[PERF] {} | {}ms", pjp.getSignature().toShortString(), elapsed);
 
         return result;
     }
 
-    // ────────── UC-04: Log sau khi chấm điểm thành công (@AfterReturning) ──────────
+    // ────────── UC-04: Log sau khi chấm điểm thành công ──────────
     @AfterReturning(
             pointcut = "execution(* com.example.projecto.service.impl.SubmissionServiceImpl.gradeSubmission(..))",
             returning = "result"
@@ -50,7 +48,6 @@ public class LoggingAspect {
         Object[] args = jp.getArgs();
         String lecturerUsername = (String) args[0];
         GradeRequest gradeRequest = (GradeRequest) args[1];
-        SubmissionResponse response = (SubmissionResponse) result;
 
         log.info("[GRADING] Lecturer '{}' graded Submission ID: {} with Score: {} | Status: GRADED",
                 lecturerUsername,
@@ -58,7 +55,7 @@ public class LoggingAspect {
                 gradeRequest.getScore());
     }
 
-    // ────────── Log khi gradeSubmission ném exception (@AfterThrowing) ──────────
+    // ────────── Log khi gradeSubmission ném exception ──────────
     @AfterThrowing(
             pointcut = "execution(* com.example.projecto.service.impl.SubmissionServiceImpl.gradeSubmission(..))",
             throwing = "ex"
@@ -74,15 +71,15 @@ public class LoggingAspect {
                 ex.getMessage());
     }
 
-    // ────────── Log khi upload file ──────────
+    // ────────── Log khi nộp bài (link hoặc file) ──────────
     @AfterReturning(
-            pointcut = "execution(* com.example.projecto.service.impl.SubmissionServiceImpl.uploadFile(..))",
+            pointcut = "execution(* com.example.projecto.service.impl.SubmissionServiceImpl.submit(..))",
             returning = "result"
     )
-    public void logFileUpload(JoinPoint jp, Object result) {
+    public void logSubmission(JoinPoint jp, Object result) {
         String username = (String) jp.getArgs()[0];
         Long courseId   = (Long)   jp.getArgs()[1];
-        log.info("[UPLOAD] Student '{}' uploaded file for Course ID: {}", username, courseId);
+        log.info("[SUBMIT] Student '{}' submitted for Course ID: {}", username, courseId);
     }
 
     // ────────── Log toàn bộ exception từ Service layer ──────────

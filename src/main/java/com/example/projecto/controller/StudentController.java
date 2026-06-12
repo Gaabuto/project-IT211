@@ -1,13 +1,10 @@
 package com.example.projecto.controller;
 
-
-import com.example.projecto.model.dto.request.SubmitLinkRequest;
 import com.example.projecto.model.dto.response.ApiResponse;
 import com.example.projecto.model.dto.response.CourseResponse;
 import com.example.projecto.model.dto.response.SubmissionResponse;
 import com.example.projecto.service.CourseService;
 import com.example.projecto.service.SubmissionService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -39,6 +36,16 @@ public class StudentController {
                 .body(ApiResponse.ok("Enrolled successfully"));
     }
 
+    //@PostMapping("/courses/{courseId}/enroll")
+    //public ResponseEntity<ApiResponse<CourseResponse>> enrollCourse(
+    //        @AuthenticationPrincipal UserDetails userDetails,
+    //        @PathVariable Long courseId) {
+    //    CourseResponse course = courseService.enrollStudent(courseId, userDetails.getUsername());
+    //    return ResponseEntity.status(HttpStatus.CREATED)
+    //            .body(ApiResponse.ok("Enrolled successfully", course));
+    //}
+
+
     // Xem các khóa học của tôi
     @GetMapping("/courses")
     public ResponseEntity<ApiResponse<Page<CourseResponse>>> getMyCourses(
@@ -48,7 +55,7 @@ public class StudentController {
                 courseService.getMyCourses(userDetails.getUsername(), pageable)));
     }
 
-    // FR-07: Nộp bài bằng link GitHub
+    // FR-07: Nộp bài — link GitHub HOẶC file (chọn 1 trong 2)
     @PostMapping("/submissions/upload")
     public ResponseEntity<ApiResponse<SubmissionResponse>> submit(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -59,17 +66,6 @@ public class StudentController {
         SubmissionResponse response = submissionService.submit(
                 userDetails.getUsername(), courseId, githubUrl, file);
         return ResponseEntity.ok(ApiResponse.ok("Submission saved", response));
-    }
-
-    // UC-05: Upload file lên Cloudinary
-    @PostMapping("/submissions/upload")
-    public ResponseEntity<ApiResponse<SubmissionResponse>> uploadFile(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @RequestParam("courseId") Long courseId,
-            @RequestParam("file") MultipartFile file) {
-        SubmissionResponse response = submissionService.uploadFile(
-                userDetails.getUsername(), courseId, file);
-        return ResponseEntity.ok(ApiResponse.ok("File uploaded and submission saved", response));
     }
 
     // Xem các bài nộp của tôi

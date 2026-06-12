@@ -12,11 +12,15 @@ import com.example.projecto.repository.UserRepository;
 import com.example.projecto.security.jwt.JwtUtil;
 import com.example.projecto.service.impl.AuthServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -25,21 +29,37 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(MockitoExtension.class)
-class AuthServiceTest {
+public class AuthServiceTest {
 
-    @Mock AuthenticationManager authenticationManager;
-    @Mock UserRepository userRepository;
-    @Mock TokenBlacklistService tokenBlacklistService;
-    @Mock JwtUtil jwtUtil;
-    @Mock PasswordEncoder passwordEncoder;
-    @Mock UserDetailsService userDetailsService;
+    @Mock
+    private AuthenticationManager authenticationManager;
 
-    @InjectMocks AuthServiceImpl authService;
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private TokenBlacklistService tokenBlacklistService;
+
+    @Mock
+    private JwtUtil jwtUtil;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private UserDetailsService userDetailsService;
+
+    @Mock
+    private RedisTemplate<String, String> redisTemplate;
+
+    @Mock
+    private JavaMailSender mailSender;
+
+    @InjectMocks
+    private AuthServiceImpl authService;
 
     private User mockUser;
 
@@ -57,82 +77,94 @@ class AuthServiceTest {
     }
 
     @Test
-    void login_success_returnsTokens() {
+    @DisplayName("AuthService - Login thành công trả về token")
+    void testLogin_Success() {
         LoginRequest request = new LoginRequest();
         request.setUsername("student01");
         request.setPassword("password123");
 
-        when(userRepository.findByUsername("student01")).thenReturn(Optional.of(mockUser));
-        when(jwtUtil.generateAccessToken(mockUser)).thenReturn("access-token");
-        when(jwtUtil.generateRefreshToken(mockUser)).thenReturn("refresh-token");
+        Mockito.when(userRepository.findByUsername("student01")).thenReturn(Optional.of(mockUser));
+        Mockito.when(jwtUtil.generateAccessToken(mockUser)).thenReturn("access-token");
+        Mockito.when(jwtUtil.generateRefreshToken(mockUser)).thenReturn("refresh-token");
 
-        AuthResponse response = authService.login(request);
+        AuthResponse result = authService.login(request);
 
-        assertThat(response.getAccessToken()).isEqualTo("access-token");
-        assertThat(response.getRefreshToken()).isEqualTo("refresh-token");
-        assertThat(response.getUsername()).isEqualTo("student01");
-        verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        assertNotNull(result);
+        assertEquals("access-token", result.getAccessToken());
+        assertEquals("refresh-token", result.getRefreshToken());
+        assertEquals("student01", result.getUsername());
+        assertEquals("STUDENT", result.getRole());
+
+        Mockito.verify(authenticationManager, Mockito.times(1))
+                .authenticate(Mockito.any(UsernamePasswordAuthenticationToken.class));
     }
 
     @Test
-    void login_wrongPassword_throwsBadCredentials() {
+    @DisplayName("AuthService - Login sai password ném BadCredentialsException")
+    void testLogin_WrongPassword_ThrowsBadCredentials() {
         LoginRequest request = new LoginRequest();
         request.setUsername("student01");
         request.setPassword("wrongpassword");
 
-        doThrow(new BadCredentialsException("Bad credentials"))
-                .when(authenticationManager).authenticate(any());
+        Mockito.doThrow(new BadCredentialsException("Bad credentials"))
+                .when(authenticationManager).authenticate(Mockito.any());
 
-        assertThatThrownBy(() -> authService.login(request))
-                .isInstanceOf(BadCredentialsException.class);
+        assertThrows(BadCredentialsException.class,
+                () -> authService.login(request));
     }
 
     @Test
-    void register_success_savesUser() {
+    @DisplayName("AuthService - Register thành công lưu user mới")
+    void testRegister_Success() {
         RegisterRequest request = new RegisterRequest();
         request.setUsername("newuser");
         request.setPassword("password123");
         request.setEmail("new@edu.com");
         request.setFullName("New User");
 
-        when(userRepository.existsByUsername("newuser")).thenReturn(false);
-        when(userRepository.existsByEmail("new@edu.com")).thenReturn(false);
-        when(passwordEncoder.encode("password123")).thenReturn("encodedPass");
+        Mockito.when(userRepository.existsByUsername("newuser")).thenReturn(false);
+        Mockito.when(userRepository.existsByEmail("new@edu.com")).thenReturn(false);
+        Mockito.when(passwordEncoder.encode("password123")).thenReturn("encodedPass");
 
         authService.register(request);
 
-        verify(userRepository).save(argThat(u ->
+        Mockito.verify(userRepository, Mockito.times(1)).save(Mockito.argThat(u ->
                 u.getUsername().equals("newuser") &&
-                        u.getRole() == RoleEnum.STUDENT
+                        u.getRole() == RoleEnum.STUDENT &&
+                        u.getIsActive()
         ));
     }
 
     @Test
-    void register_duplicateUsername_throwsException() {
+    @DisplayName("AuthService - Register username đã tồn tại ném DuplicateResourceException")
+    void testRegister_DuplicateUsername_ThrowsException() {
         RegisterRequest request = new RegisterRequest();
         request.setUsername("student01");
         request.setPassword("password123");
         request.setEmail("other@edu.com");
         request.setFullName("Other");
 
-        when(userRepository.existsByUsername("student01")).thenReturn(true);
+        Mockito.when(userRepository.existsByUsername("student01")).thenReturn(true);
 
-        assertThatThrownBy(() -> authService.register(request))
-                .isInstanceOf(DuplicateResourceException.class)
-                .hasMessageContaining("Username already exists");
+        DuplicateResourceException ex = assertThrows(DuplicateResourceException.class,
+                () -> authService.register(request));
+
+        assertTrue(ex.getMessage().contains("Username already exists"));
     }
 
     @Test
-    void changePassword_wrongCurrentPassword_throwsException() {
+    @DisplayName("AuthService - Đổi mật khẩu sai mật khẩu cũ ném InvalidStateException")
+    void testChangePassword_WrongCurrentPassword_ThrowsException() {
         ChangePasswordRequest request = new ChangePasswordRequest();
         request.setCurrentPassword("wrongOld");
         request.setNewPassword("newPassword123");
 
-        when(userRepository.findByUsername("student01")).thenReturn(Optional.of(mockUser));
-        when(passwordEncoder.matches("wrongOld", mockUser.getPasswordHash())).thenReturn(false);
+        Mockito.when(userRepository.findByUsername("student01")).thenReturn(Optional.of(mockUser));
+        Mockito.when(passwordEncoder.matches("wrongOld", mockUser.getPasswordHash())).thenReturn(false);
 
-        assertThatThrownBy(() -> authService.changePassword("student01", request))
-                .isInstanceOf(InvalidStateException.class)
-                .hasMessageContaining("Current password is incorrect");
+        InvalidStateException ex = assertThrows(InvalidStateException.class,
+                () -> authService.changePassword("student01", request));
+
+        assertEquals("Current password is incorrect", ex.getMessage());
     }
 }

@@ -3,7 +3,6 @@ package com.example.projecto.service.impl;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.example.projecto.model.dto.request.GradeRequest;
-import com.example.projecto.model.dto.request.SubmitLinkRequest;
 import com.example.projecto.model.dto.response.SubmissionResponse;
 import com.example.projecto.model.entity.*;
 import com.example.projecto.exception.InvalidStateException;
@@ -41,13 +40,13 @@ public class SubmissionServiceImpl implements SubmissionService {
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     );
 
-    // ──────────────── Student: nộp link GitHub ────────────────
+    // ──────────────── FR-07: Nộp bài — link GitHub HOẶC file ────────────────
 
     @Override
     @Transactional
     public SubmissionResponse submit(String studentUsername, Long courseId, String githubUrl, MultipartFile file) {
 
-        // BƯỚC 1: Validate — phải có ĐÚNG 1 trong 2 (không cả 2, không thiếu cả 2)
+        // Bước 1: Validate — phải có đúng 1 trong 2
         boolean hasLink = githubUrl != null && !githubUrl.isBlank();
         boolean hasFile = file != null && !file.isEmpty();
 
@@ -58,7 +57,7 @@ public class SubmissionServiceImpl implements SubmissionService {
             throw new InvalidStateException("Provide only one: githubUrl OR file, not both");
         }
 
-        // BƯỚC 2: Lấy student, course, submission (logic cũ, dùng chung)
+        // Bước 2: Lấy student, course, submission
         User student = getUser(studentUsername);
         Course course = getCourse(courseId);
         Submission submission = getOrCreateSubmission(student, course);
@@ -67,12 +66,12 @@ public class SubmissionServiceImpl implements SubmissionService {
             throw new InvalidStateException("This submission has already been graded");
         }
 
-        // BƯỚC 3: Xử lý theo từng trường hợp
+        // Bước 3: Xử lý theo từng trường hợp
         if (hasLink) {
-            // Trường hợp 1: nộp link GitHub
             submission.setReportUrl(githubUrl);
+            log.info("Student '{}' submitted GitHub link for course '{}'",
+                    studentUsername, course.getCourseCode());
         } else {
-            // Trường hợp 2: nộp file → validate type → upload Cloudinary
             if (!ALLOWED_TYPES.contains(file.getContentType())) {
                 throw new InvalidStateException("Only PDF and Word documents are allowed");
             }
@@ -89,21 +88,19 @@ public class SubmissionServiceImpl implements SubmissionService {
                 String secureUrl = (String) uploadResult.get("secure_url");
                 submission.setReportUrl(secureUrl);
 
+                log.info("File uploaded to Cloudinary for student '{}', url: {}", studentUsername, secureUrl);
+
             } catch (IOException e) {
                 log.error("Cloudinary upload failed: {}", e.getMessage());
                 throw new RuntimeException("Cloud storage service unavailable. Please try again later.");
             }
         }
 
-        // BƯỚC 4: Set status chung cho cả 2 trường hợp
+        // Bước 4: Set status chung
         submission.setStatus(SubmissionStatus.SUBMITTED);
-
-        log.info("Student '{}' submitted via {} for course '{}'",
-                studentUsername, hasLink ? "GitHub link" : "file upload", course.getCourseCode());
 
         return toResponse(submissionRepository.save(submission));
     }
-
 
     // ──────────────── Lecturer: chấm điểm (UC-04) ────────────────
 
@@ -115,7 +112,6 @@ public class SubmissionServiceImpl implements SubmissionService {
         Submission submission = submissionRepository.findById(request.getSubmissionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found: " + request.getSubmissionId()));
 
-        // Kiểm tra trạng thái: phải SUBMITTED hoặc LATE mới được chấm
         if (submission.getStatus() == SubmissionStatus.PENDING) {
             throw new InvalidStateException("Cannot grade: student has not submitted yet");
         }
@@ -125,7 +121,6 @@ public class SubmissionServiceImpl implements SubmissionService {
         submission.setLecturer(lecturer);
         submission.setStatus(SubmissionStatus.GRADED);
 
-        // AOP @AfterReturning sẽ tự log sau khi method này return thành công
         return toResponse(submissionRepository.save(submission));
     }
 
