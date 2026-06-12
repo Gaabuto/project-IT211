@@ -41,6 +41,13 @@ public class GlobalExceptionHandler {
         return buildError(HttpStatus.FORBIDDEN, "Access denied", req.getRequestURI());
     }
 
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedMediaType(
+            org.springframework.web.HttpMediaTypeNotSupportedException ex,
+            HttpServletRequest req) {
+        return buildError(HttpStatus.BAD_REQUEST, "Content-Type must be application/json", req.getRequestURI());
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex,
                                                         HttpServletRequest req) {

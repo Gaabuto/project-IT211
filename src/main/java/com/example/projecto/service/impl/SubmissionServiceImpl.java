@@ -45,32 +45,20 @@ public class SubmissionServiceImpl implements SubmissionService {
 
     @Override
     @Transactional
-    public SubmissionResponse submitLink(String studentUsername, SubmitLinkRequest request) {
-        User student = getUser(studentUsername);
-        Course course = getCourse(request.getCourseId());
+    public SubmissionResponse submit(String studentUsername, Long courseId, String githubUrl, MultipartFile file) {
 
-        Submission submission = getOrCreateSubmission(student, course);
+        // BƯỚC 1: Validate — phải có ĐÚNG 1 trong 2 (không cả 2, không thiếu cả 2)
+        boolean hasLink = githubUrl != null && !githubUrl.isBlank();
+        boolean hasFile = file != null && !file.isEmpty();
 
-        if (submission.getStatus() == SubmissionStatus.GRADED) {
-            throw new InvalidStateException("This submission has already been graded");
+        if (!hasLink && !hasFile) {
+            throw new InvalidStateException("Must provide either githubUrl or file");
+        }
+        if (hasLink && hasFile) {
+            throw new InvalidStateException("Provide only one: githubUrl OR file, not both");
         }
 
-        submission.setReportUrl(request.getGithubUrl());
-        submission.setStatus(SubmissionStatus.SUBMITTED);
-
-        return toResponse(submissionRepository.save(submission));
-    }
-
-    // ──────────────── Student: upload file lên Cloudinary ────────────────
-
-    @Override
-    @Transactional
-    public SubmissionResponse uploadFile(String studentUsername, Long courseId, MultipartFile file) {
-        // Validate file type
-        if (!ALLOWED_TYPES.contains(file.getContentType())) {
-            throw new InvalidStateException("Only PDF and Word documents are allowed");
-        }
-
+        // BƯỚC 2: Lấy student, course, submission (logic cũ, dùng chung)
         User student = getUser(studentUsername);
         Course course = getCourse(courseId);
         Submission submission = getOrCreateSubmission(student, course);
@@ -79,29 +67,43 @@ public class SubmissionServiceImpl implements SubmissionService {
             throw new InvalidStateException("This submission has already been graded");
         }
 
-        try {
-            // Upload lên Cloudinary
-            Map<?, ?> uploadResult = cloudinary.uploader().upload(
-                    file.getBytes(),
-                    ObjectUtils.asMap(
-                            "folder", "submissions/" + courseId,
-                            "resource_type", "raw",
-                            "public_id", "student_" + student.getId() + "_" + System.currentTimeMillis()
-                    )
-            );
+        // BƯỚC 3: Xử lý theo từng trường hợp
+        if (hasLink) {
+            // Trường hợp 1: nộp link GitHub
+            submission.setReportUrl(githubUrl);
+        } else {
+            // Trường hợp 2: nộp file → validate type → upload Cloudinary
+            if (!ALLOWED_TYPES.contains(file.getContentType())) {
+                throw new InvalidStateException("Only PDF and Word documents are allowed");
+            }
 
-            String secureUrl = (String) uploadResult.get("secure_url");
-            submission.setReportUrl(secureUrl);
-            submission.setStatus(SubmissionStatus.SUBMITTED);
+            try {
+                Map<?, ?> uploadResult = cloudinary.uploader().upload(
+                        file.getBytes(),
+                        ObjectUtils.asMap(
+                                "folder", "submissions/" + courseId,
+                                "resource_type", "raw",
+                                "public_id", "student_" + student.getId() + "_" + System.currentTimeMillis()
+                        )
+                );
+                String secureUrl = (String) uploadResult.get("secure_url");
+                submission.setReportUrl(secureUrl);
 
-            log.info("File uploaded to Cloudinary for student '{}', url: {}", studentUsername, secureUrl);
-            return toResponse(submissionRepository.save(submission));
-
-        } catch (IOException e) {
-            log.error("Cloudinary upload failed: {}", e.getMessage());
-            throw new RuntimeException("Cloud storage service unavailable. Please try again later.");
+            } catch (IOException e) {
+                log.error("Cloudinary upload failed: {}", e.getMessage());
+                throw new RuntimeException("Cloud storage service unavailable. Please try again later.");
+            }
         }
+
+        // BƯỚC 4: Set status chung cho cả 2 trường hợp
+        submission.setStatus(SubmissionStatus.SUBMITTED);
+
+        log.info("Student '{}' submitted via {} for course '{}'",
+                studentUsername, hasLink ? "GitHub link" : "file upload", course.getCourseCode());
+
+        return toResponse(submissionRepository.save(submission));
     }
+
 
     // ──────────────── Lecturer: chấm điểm (UC-04) ────────────────
 

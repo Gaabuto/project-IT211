@@ -49,11 +49,15 @@ public class StudentController {
     }
 
     // FR-07: Nộp bài bằng link GitHub
-    @PostMapping("/submissions/link")
-    public ResponseEntity<ApiResponse<SubmissionResponse>> submitLink(
+    @PostMapping("/submissions/upload")
+    public ResponseEntity<ApiResponse<SubmissionResponse>> submit(
             @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody SubmitLinkRequest request) {
-        SubmissionResponse response = submissionService.submitLink(userDetails.getUsername(), request);
+            @RequestParam("courseId") Long courseId,
+            @RequestParam(value = "githubUrl", required = false) String githubUrl,
+            @RequestParam(value = "file", required = false) MultipartFile file) {
+
+        SubmissionResponse response = submissionService.submit(
+                userDetails.getUsername(), courseId, githubUrl, file);
         return ResponseEntity.ok(ApiResponse.ok("Submission saved", response));
     }
 
